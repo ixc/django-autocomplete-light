@@ -1,42 +1,91 @@
 """Test case for autocomplete implementations."""
 
 import uuid
+import time
 
 from django import VERSION
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.urlresolvers import reverse
 from django.utils import six
 
-from sbo_selenium import SeleniumTestCase
-
 from selenium.common.exceptions import NoSuchElementException
 
+from splinter import Browser
+from splinter.exceptions import ElementDoesNotExist
+import unittest
 
-class AutocompleteTestCase(SeleniumTestCase):
+
+GLOBAL_BROWSER = None
+
+
+class AutocompleteTestCase(StaticLiveServerTestCase):
     """Provide a class-persistent selenium instance and assertions."""
+
+    @classmethod
+    def setUpClass(cls):
+        global GLOBAL_BROWSER
+
+        if GLOBAL_BROWSER is None:
+            GLOBAL_BROWSER = Browser()
+        cls.browser = GLOBAL_BROWSER
+
+        super(AutocompleteTestCase, cls).setUpClass()
+
+    def get(self, url):
+        self.browser.visit('%s%s' % (
+            self.live_server_url,
+            url
+        ))
+
+        if '/admin/login/' in self.browser.url:
+            # Should be pre-filled by HTML template
+            # self.browser.fill('username', 'test')
+            # self.browser.fill('password', 'test')
+            self.browser.find_by_value('Log in').click()
+
+    def click(self, selector):
+        self.browser.find_by_css(selector).click()
+
+    def enter_text(self, selector, text):
+        self.browser.find_by_css(selector).type(text)
+
+    def assert_not_visible(self, selector):
+        e = self.browser.find_by_css(selector)
+        assert not e or e.visible is False
+
+    def assert_visible(self, selector):
+        assert self.browser.find_by_css(selector).visible is True
+
+    def wait_until_not_visible(self, selector):
+        e = self.browser.find_by_css(selector)
+        # WARNING, infinitie loop
+        try:
+            i = 0
+
+            while e or e[0].visible:
+                time.sleep(0.1)
+                i += 1
+
+                if i > 1000:
+                    self.fail()
+        except ElementDoesNotExist:
+            # Element is gone !
+            return
+
+    def wait_until_element_contains(self, selector, content):
+        i = 0
+
+        while content not in self.browser.find_by_css(selector).html:
+            time.sleep(0.1)
+            i += 1
+
+            if i > 1000:
+                self.fail()
 
 
 class AdminMixin(object):
     """Mixin for tests that should happen in ModelAdmin."""
-
-    def get(self, url):
-        """Get a URL, logs in if necessary."""
-        super(AdminMixin, self).get(url)
-
-        try:
-            self.sel.find_element_by_css_selector('input[value="Log in"]')
-        except NoSuchElementException:
-            return
-
-        username = self.sel.find_element_by_name('username')
-        if username.get_attribute('value') != 'test':
-            username.send_keys('test')
-
-        password = self.sel.find_element_by_name('username')
-        if password.get_attribute('value') != 'test':
-            password.send_keys('test')
-
-        self.sel.find_element_by_css_selector('input[value="Log in"]').click()
 
     def get_modeladmin_url(self, action, **kwargs):
         """Return a modeladmin url for a model and action."""
@@ -51,7 +100,7 @@ class AdminMixin(object):
         i = self.id()
         half = int(len(i))
         not_id = i[half:] + i[:half]
-        self.enter_text('[name=name]', not_id)
+        self.browser.fill('name', not_id)
 
 
 class OptionMixin(object):

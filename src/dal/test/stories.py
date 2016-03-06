@@ -48,7 +48,7 @@ class BaseStory(object):
     def find_option(self, text):
         """Incremental sleep until option appeared."""
         tries = 0
-        options = self.case.sel.find_elements_by_css_selector(
+        options = self.case.browser.find_by_css(
             self.option_selector)
 
         while True:
@@ -64,7 +64,7 @@ class BaseStory(object):
 
             time.sleep(tries)
             tries += 1
-            options = self.case.sel.find_elements_by_css_selector(
+            options = self.case.browser.find_by_css(
                 self.option_selector)
 
     def get_field_label_selector(self):
@@ -73,13 +73,13 @@ class BaseStory(object):
 
     def clean_label_from_remove_buton(self):
         """Clean child nodes before checking (ie. clear option)."""
-        self.case.sel.execute_script(
+        self.case.browser.execute_script(
             '$("%s *").remove()' % self.get_field_label_selector()
         )
 
     def get_label(self):
         """Return autocomplete widget label."""
-        label = self.case.sel.find_element_by_css_selector(
+        label = self.case.browser.find_by_css(
             self.get_field_label_selector()
         )
 
@@ -95,10 +95,10 @@ class BaseStory(object):
 
     def get_value(self):
         """Return the autocomplete field value."""
-        field = self.case.sel.find_element_by_css_selector(
+        field = self.case.browser.find_by_css(
             self.field_selector)
 
-        return field.get_attribute('value')
+        return field['value']
 
     def assert_value(self, value):
         """Assart that the actual field value matches value."""
@@ -121,14 +121,12 @@ class BaseStory(object):
 
     def switch_to_popup(self):
         """Switch to popup window."""
-        self.case.sel.switch_to_window(
-            self.case.sel.window_handles[-1])
+        self.case.browser.windows.current = self.case.browser.windows[1]
         self.in_popup = True
 
     def switch_to_main(self):
         """Switch back to main window."""
-        self.case.sel.switch_to_window(
-            self.case.sel.window_handles[0])
+        self.case.browser.windows.current = self.case.browser.windows[0]
         self.in_popup = False
 
     def submit(self):
@@ -156,14 +154,14 @@ class BaseStory(object):
     def get_suggestions(self):
         """Return the list of suggestions in the autocomplete box."""
         def _options():
-            return self.case.sel.find_elements_by_css_selector(
+            return self.case.browser.find_by_css(
                 self.option_selector)
 
         options = _options()
         while len(options) and 'Searching' in options[0].text:
             time.sleep(0.3)
             options = _options()
-        return [(o.get_attribute('value'), o.text) for o in options]
+        return [(o['value'], o.text) for o in options]
 
     def get_suggestions_labels(self):
         """Return labels for suggestions in the autocomplete box."""
@@ -214,10 +212,10 @@ class InlineSelectOption(SelectOption):
 
     def select_option(self, text):
         """Ensure the inline is displayed before calling parent method."""
-        num = len(self.case.sel.find_elements_by_css_selector(
+        num = len(self.case.browser.find_by_css(
             '.dynamic-%s' % self.inline_related_name))
 
-        add = self.case.sel.find_element_by_partial_link_text('Add another')
+        add = self.case.browser.find_link_by_partial_text('Add another')
         while num < self.inline_number + 1:
             add.click()
             num += 1
@@ -233,9 +231,9 @@ class RenameOption(SelectOption):
         self.case.click('#change_id_%s' % self.field_name)
 
         self.switch_to_popup()
-        name_input = self.case.sel.find_element_by_id('id_name')
+        name_input = self.case.browser.find_by_id('id_name')
         self.case.assertEquals(
-            name_input.get_attribute('value'),
+            name_input['value'],
             current_name
         )
 
@@ -250,7 +248,7 @@ class AddAnotherOption(BaseStory):
 
     def add_another(self, name):
         """Click the add button and add another option in the popup."""
-        self.case.click('#add_id_%s' % self.field_name)
+        self.case.browser.find_by_id('add_id_%s' % self.field_name).click()
 
         self.switch_to_popup()
         self.case.enter_text('#id_name', name)
@@ -287,7 +285,7 @@ class MultipleMixin(object):
 
     def clean_label_from_remove_buton(self):
         """Clean child nodes before checking (ie. clear option)."""
-        self.case.sel.execute_script(
+        self.case.browser.execute_script(
             '$("%s span").remove()' % self.get_field_labels_selector()
         )
 
@@ -295,7 +293,7 @@ class MultipleMixin(object):
         """Return autocomplete widget label."""
         self.clean_label_from_remove_buton()
 
-        labels = self.case.sel.find_elements_by_css_selector(
+        labels = self.case.browser.find_by_css(
             self.get_field_labels_selector()
         )
 
@@ -304,13 +302,13 @@ class MultipleMixin(object):
     def get_values(self):
         """Return the autocomplete field value."""
         script = """
-        val = [];
+        window.GET_VALUES = [];
         $('%s option:selected').each(function() {
-            val.push($(this).attr('value'));
+            GET_VALUES.push($(this).attr('value'));
         });
-        return val
         """ % self.field_selector
-        return self.case.sel.execute_script(script)
+        self.case.browser.execute_script(script)
+        return self.case.browser.evaluate_script('window.GET_VALUES')
 
     def assert_labels(self, texts):
         """Assert that all labels match texts."""

@@ -82,9 +82,9 @@
 
     });
 
+    // Remove this block when this is merged upstream:
+    // https://github.com/select2/select2/pull/4249
     $(document).on('DOMSubtreeModified', '[data-autocomplete-light-function=select2] option', function() {
-        var id = $(this).parents('select').attr('id')
-        var newText = $(this).text()
-        $('#select2-' + id + '-container').text(newText);
+        $(this).parents('select').trigger('change');
     });
 })(yl.jQuery);

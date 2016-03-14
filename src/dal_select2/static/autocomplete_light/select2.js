@@ -29,7 +29,7 @@
                         forward = forward.split(',');
 
                         for (var key in forward) {
-                            data_forward[forward[key]] = $('[name=' + forward[key] + ']').val();
+                            data_forward[forward[key]] = $('[name$=' + forward[key] + ']', $('form', element.parents())).val();
                         }
 
                         data.forward = JSON.stringify(data_forward);
